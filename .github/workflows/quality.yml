@@ -1,0 +1,53 @@
+name: Quality
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: quality-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  sonarcloud:
+    name: SonarCloud
+    runs-on: ubuntu-latest
+
+    # ✅ ne tourner que sur le dépôt du prof
+    if: ${{ github.repository == 'but-sd/marvel-app-2025' }}
+
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      SONAR_TOKEN:  ${{ secrets.SONAR_TOKEN }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - run: npm install
+      - run: npm run test:coverage
+
+      - name: SonarCloud Scan
+        if: ${{ env.SONAR_TOKEN != '' }}   # ✅ test du secret au niveau du step
+        uses: SonarSource/sonarqube-scan-action@v6
+        env:
+          GITHUB_TOKEN: ${{ env.GITHUB_TOKEN }}
+          SONAR_TOKEN:  ${{ env.SONAR_TOKEN }}
+
+      - name: SonarQube Quality Gate check
+        if: ${{ env.SONAR_TOKEN != '' }}   # ✅ idem
+        id: sonarqube-quality-gate-check
+        uses: sonarsource/sonarqube-quality-gate-action@v1
+        env:
+          SONAR_TOKEN: ${{ env.SONAR_TOKEN }}
